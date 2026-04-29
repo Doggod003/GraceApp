@@ -1,10 +1,13 @@
+
+Copy
+
 // ─────────────────────────────────────────────────────────────────────────
 // VEHICLE DATABASE
 // To add cars: append new objects to this array. Each car needs:
 //   id, year, make, model, trim, price, mpg, maintMo, regMo
 // (maintMo and regMo are estimated monthly maintenance + registration)
 // ─────────────────────────────────────────────────────────────────────────
-
+ 
 const VEHICLES = [
   {
     id: 'ford-bronco-sport-big-bend-2026',
@@ -103,31 +106,31 @@ const VEHICLES = [
     notes: '2.5L · AWD · 187 hp'
   }
 ];
-
+ 
 // ─────────────────────────────────────────────────────────────────────────
 // SHARED FORMATTERS
 // ─────────────────────────────────────────────────────────────────────────
-
+ 
 function dollar(n) {
   if (!isFinite(n)) return '$—';
   return '$' + Math.round(n).toLocaleString('en-US');
 }
-
+ 
 function vehicleLabel(v) {
   return `${v.year} ${v.make} ${v.model} ${v.trim}`;
 }
-
+ 
 // ─────────────────────────────────────────────────────────────────────────
 // CALCULATIONS
 // ─────────────────────────────────────────────────────────────────────────
-
+ 
 function pmt(principal, annualRatePct, months) {
   if (months <= 0) return 0;
   if (annualRatePct === 0) return principal / months;
   const r = annualRatePct / 100 / 12;
   return principal * (r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1);
 }
-
+ 
 function calcCar(vehicle, inp) {
   const taxedPrice = vehicle.price * (1 + inp.tax / 100);
   const loan = Math.max(0, taxedPrice - inp.down - inp.trade);
@@ -141,7 +144,7 @@ function calcCar(vehicle, inp) {
   const interest = Math.max(0, totalPaid - loan);
   return { payment, fuel, ins, maint, reg, total, loan, totalPaid, interest, taxedPrice };
 }
-
+ 
 function buildForecast(vehicle, inp, breakdown) {
   // Returns periodic cumulative totals across 5 years with 3% annual gas inflation
   const GAS_INC = 0.03;
@@ -169,73 +172,192 @@ function buildForecast(vehicle, inp, breakdown) {
   }
   return out;
 }
-
+ 
 // ─────────────────────────────────────────────────────────────────────────
 // SHARED INPUT BUILDER (sidebar UI)
+// Layout per input:
+//   Label                          [+/- bump cluster]
+//   ─────●─────────  (slider)
+//   [−]  [$ 1,234 ]  [+]   (number row with unit prefix/suffix)
+// All three controls (slider, text, bumps) stay in sync.
 // ─────────────────────────────────────────────────────────────────────────
-
+ 
+const SLIDER_CONFIG = [
+  { id: 'trade', label: 'Trade-in value',  min: 0,    max: 50000, step: 50,   default: 0,    bump: 50,   format: 'dollar',    prefix: '$' },
+  { id: 'down',  label: 'Down payment',    min: 0,    max: 30000, step: 50,   default: 3000, bump: 50,   format: 'dollar',    prefix: '$' },
+  { id: 'apr',   label: 'APR',             min: 0,    max: 20,    step: 0.01, default: 6.99, bump: 0.01, format: 'percent',   suffix: '%', decimals: 2 },
+  { id: 'term',  label: 'Loan term',       min: 12,   max: 96,    step: 1,    default: 60,   bump: 1,    format: 'months',    suffix: 'mo' },
+  { id: 'miles', label: 'Miles / month',   min: 100,  max: 5000,  step: 10,   default: 1000, bump: 10,   format: 'number' },
+  { id: 'gas',   label: 'Gas price / gal', min: 1.00, max: 7.00,  step: 0.01, default: 3.50, bump: 0.01, format: 'dollarDec', prefix: '$', decimals: 2 },
+  { id: 'ins',   label: 'Insurance / mo.', min: 0,    max: 800,   step: 1,    default: 150,  bump: 1,    format: 'dollar',    prefix: '$' },
+  { id: 'tax',   label: 'Sales tax',       min: 0,    max: 12,    step: 0.01, default: 6.00, bump: 0.01, format: 'percent',   suffix: '%', decimals: 2 },
+];
+ 
+function formatVal(val, format, decimals) {
+  if (format === 'dollar')    return Math.round(val).toLocaleString('en-US');
+  if (format === 'dollarDec') return val.toFixed(decimals || 2);
+  if (format === 'percent')   return val.toFixed(decimals || 2);
+  if (format === 'months')    return Math.round(val);
+  if (format === 'number')    return Math.round(val).toLocaleString('en-US');
+  return val;
+}
+ 
+function parseVal(text) {
+  const cleaned = String(text).replace(/[$,%\s]|mo/gi, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+ 
+function clamp(val, min, max) {
+  return Math.max(min, Math.min(max, val));
+}
+ 
 function buildSidebar(container, onUpdate) {
-  container.innerHTML = `
-    <div class="sidebar-title">Your Numbers</div>
-
-    <div class="input-group">
-      <div class="input-label"><span>Trade-in value</span><span class="val" id="v-trade">$0</span></div>
-      <input type="range" id="s-trade" min="0" max="20000" step="500" value="0">
-    </div>
-    <div class="input-group">
-      <div class="input-label"><span>Down payment</span><span class="val" id="v-down">$3,000</span></div>
-      <input type="range" id="s-down" min="0" max="15000" step="250" value="3000">
-    </div>
-    <div class="input-group">
-      <div class="input-label"><span>APR</span><span class="val" id="v-apr">6.99%</span></div>
-      <input type="range" id="s-apr" min="2" max="15" step="0.25" value="6.99">
-    </div>
-    <div class="input-group">
-      <div class="input-label"><span>Loan term</span><span class="val" id="v-term">60 mo.</span></div>
-      <input type="range" id="s-term" min="24" max="84" step="12" value="60">
-    </div>
-
-    <div class="divider-label">Driving &amp; Costs</div>
-
-    <div class="input-group">
-      <div class="input-label"><span>Miles / month</span><span class="val" id="v-miles">1,000</span></div>
-      <input type="range" id="s-miles" min="300" max="3000" step="100" value="1000">
-    </div>
-    <div class="input-group">
-      <div class="input-label"><span>Gas price / gal</span><span class="val" id="v-gas">$3.50</span></div>
-      <input type="range" id="s-gas" min="2.50" max="5.50" step="0.05" value="3.50">
-    </div>
-    <div class="input-group">
-      <div class="input-label"><span>Insurance / mo.</span><span class="val" id="v-ins">$150</span></div>
-      <input type="range" id="s-ins" min="80" max="400" step="10" value="150">
-    </div>
-    <div class="input-group">
-      <div class="input-label"><span>PA sales tax</span><span class="val" id="v-tax">6.0%</span></div>
-      <input type="range" id="s-tax" min="0" max="10" step="0.5" value="6">
-    </div>
-  `;
-
-  const ids = ['s-trade','s-down','s-apr','s-term','s-miles','s-gas','s-ins','s-tax'];
-  ids.forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      refreshSidebarLabels();
+  let html = `<div class="sidebar-title">Your Numbers</div>`;
+  let drivingAdded = false;
+ 
+  SLIDER_CONFIG.forEach(cfg => {
+    if (cfg.id === 'miles' && !drivingAdded) {
+      html += `<div class="divider-label">Driving &amp; Costs</div>`;
+      drivingAdded = true;
+    }
+ 
+    const prefixHtml = cfg.prefix ? `<span class="num-prefix">${cfg.prefix}</span>` : '';
+    const suffixHtml = cfg.suffix ? `<span class="num-suffix">${cfg.suffix}</span>` : '';
+    const inputClass = `num-input${cfg.prefix ? ' has-prefix' : ''}${cfg.suffix ? ' has-suffix' : ''}`;
+ 
+    html += `
+      <div class="input-group" data-cfg="${cfg.id}">
+        <div class="input-label">
+          <span>${cfg.label}</span>
+        </div>
+        <input type="range" id="s-${cfg.id}" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}" value="${cfg.default}">
+        <div class="num-row">
+          <button class="bump-btn" data-bump="-" data-target="${cfg.id}" aria-label="Decrease">−</button>
+          <div class="num-wrap">
+            ${prefixHtml}
+            <input type="text" inputmode="decimal" class="${inputClass}" id="v-${cfg.id}" value="${formatVal(cfg.default, cfg.format, cfg.decimals)}" />
+            ${suffixHtml}
+          </div>
+          <button class="bump-btn" data-bump="+" data-target="${cfg.id}" aria-label="Increase">+</button>
+        </div>
+      </div>`;
+  });
+ 
+  // Reset to defaults button
+  html += `<button class="reset-btn" id="reset-defaults">Reset to defaults</button>`;
+ 
+  container.innerHTML = html;
+ 
+  // ─── Wire up sliders → text inputs ───
+  SLIDER_CONFIG.forEach(cfg => {
+    const slider = document.getElementById(`s-${cfg.id}`);
+    const text   = document.getElementById(`v-${cfg.id}`);
+ 
+    slider.addEventListener('input', () => {
+      text.value = formatVal(+slider.value, cfg.format, cfg.decimals);
+      text.classList.remove('invalid');
       onUpdate();
     });
+ 
+    // Text → slider (commit on blur or Enter)
+    const commitText = () => {
+      const parsed = parseVal(text.value);
+      if (parsed === null) {
+        text.classList.add('invalid');
+        return;
+      }
+      const clamped = clamp(parsed, cfg.min, cfg.max);
+      slider.value = clamped;
+      text.value = formatVal(clamped, cfg.format, cfg.decimals);
+      text.classList.remove('invalid');
+      onUpdate();
+    };
+ 
+    text.addEventListener('blur', commitText);
+    text.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        text.blur();
+      }
+      // Arrow keys for fine-tune from the input
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const direction = e.key === 'ArrowUp' ? 1 : -1;
+        const stepSize = e.shiftKey ? cfg.bump * 10 : cfg.bump;
+        const current = +slider.value;
+        const next = clamp(
+          Math.round((current + direction * stepSize) * 100) / 100,
+          cfg.min, cfg.max
+        );
+        slider.value = next;
+        text.value = formatVal(next, cfg.format, cfg.decimals);
+        text.classList.remove('invalid');
+        onUpdate();
+      }
+    });
+    text.addEventListener('focus', () => setTimeout(() => text.select(), 0));
+  });
+ 
+  // ─── Wire up bump buttons (precision + hold-to-repeat) ───
+  container.querySelectorAll('.bump-btn').forEach(btn => {
+    const id = btn.dataset.target;
+    const direction = btn.dataset.bump === '+' ? 1 : -1;
+    const cfg = SLIDER_CONFIG.find(c => c.id === id);
+ 
+    const doBump = () => {
+      const slider = document.getElementById(`s-${id}`);
+      const text   = document.getElementById(`v-${id}`);
+      const current = +slider.value;
+      const next = clamp(
+        Math.round((current + direction * cfg.bump) * 100) / 100,
+        cfg.min, cfg.max
+      );
+      slider.value = next;
+      text.value = formatVal(next, cfg.format, cfg.decimals);
+      text.classList.remove('invalid');
+      onUpdate();
+    };
+ 
+    btn.addEventListener('click', doBump);
+ 
+    // Hold-to-repeat
+    let holdTimer, repeatTimer;
+    const startHold = () => {
+      holdTimer = setTimeout(() => {
+        repeatTimer = setInterval(doBump, 60);
+      }, 350);
+    };
+    const stopHold = () => {
+      clearTimeout(holdTimer);
+      clearInterval(repeatTimer);
+    };
+    btn.addEventListener('mousedown', startHold);
+    btn.addEventListener('touchstart', startHold, { passive: true });
+    btn.addEventListener('mouseup', stopHold);
+    btn.addEventListener('mouseleave', stopHold);
+    btn.addEventListener('touchend', stopHold);
+    btn.addEventListener('touchcancel', stopHold);
+  });
+ 
+  // ─── Reset button ───
+  document.getElementById('reset-defaults').addEventListener('click', () => {
+    SLIDER_CONFIG.forEach(cfg => {
+      const slider = document.getElementById(`s-${cfg.id}`);
+      const text   = document.getElementById(`v-${cfg.id}`);
+      slider.value = cfg.default;
+      text.value = formatVal(cfg.default, cfg.format, cfg.decimals);
+      text.classList.remove('invalid');
+    });
+    onUpdate();
   });
 }
-
+ 
 function refreshSidebarLabels() {
-  const inp = getInputs();
-  document.getElementById('v-trade').textContent = dollar(inp.trade);
-  document.getElementById('v-down').textContent  = dollar(inp.down);
-  document.getElementById('v-apr').textContent   = inp.apr.toFixed(2) + '%';
-  document.getElementById('v-term').textContent  = inp.term + ' mo.';
-  document.getElementById('v-miles').textContent = inp.miles.toLocaleString();
-  document.getElementById('v-gas').textContent   = '$' + inp.gas.toFixed(2);
-  document.getElementById('v-ins').textContent   = dollar(inp.ins);
-  document.getElementById('v-tax').textContent   = parseFloat(inp.tax).toFixed(1) + '%';
+  // No-op: text inputs now drive themselves. Kept for backwards compatibility
+  // with existing pages that call this.
 }
-
+ 
 function getInputs() {
   return {
     trade: +document.getElementById('s-trade').value,
@@ -248,11 +370,11 @@ function getInputs() {
     tax:   +document.getElementById('s-tax').value,
   };
 }
-
+ 
 // ─────────────────────────────────────────────────────────────────────────
 // VEHICLE SELECT BUILDER
 // ─────────────────────────────────────────────────────────────────────────
-
+ 
 function buildVehicleSelect(currentId, excludeIds = []) {
   // Group by Make
   const byMake = {};
@@ -272,4 +394,3 @@ function buildVehicleSelect(currentId, excludeIds = []) {
     html += `</optgroup>`;
   }
   return html;
-}
