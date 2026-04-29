@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriveSmart — Single Vehicle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="logo">Drive<span>Smart</span></a>
+  <nav class="tabs">
+    <a href="index.html">Home</a>
+    <a href="single.html" class="active">Single Vehicle</a>
+    <a href="compare.html">Compare</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <h1>Single vehicle <em>deep-dive</em></h1>
+  <p>Pick a vehicle, set your numbers, see the full breakdown.</p>
+</div>
+
+<div class="main with-sidebar">
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="panel">
+
+    <!-- Vehicle picker -->
+    <div class="picker-grid cols-1">
+      <div class="picker-card" data-slot="0">
+        <div class="picker-label">
+          <span>VEHICLE</span>
+        </div>
+        <select class="car-select" id="vehicle-select"></select>
+        <div class="picker-detail">
+          <span id="vehicle-detail">—</span>
+          <span class="price" id="vehicle-price">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monthly cost result -->
+    <div class="result-row cols-1">
+      <div class="result-card" data-slot="0">
+        <div class="result-label">Total monthly cost</div>
+        <div class="result-main" id="r-total">—</div>
+        <div class="result-sub" id="r-total-sub">payment + fuel + insurance + maintenance</div>
+      </div>
+    </div>
+
+    <!-- Highlight payment vs others -->
+    <div class="result-row cols-2">
+      <div class="result-card" data-slot="0">
+        <div class="result-label">Car payment</div>
+        <div class="result-main" id="r-payment">—</div>
+        <div class="result-sub" id="r-payment-sub">—</div>
+      </div>
+      <div class="result-card" data-slot="0">
+        <div class="result-label">Fuel cost</div>
+        <div class="result-main" id="r-fuel">—</div>
+        <div class="result-sub" id="r-fuel-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Loan summary -->
+    <div class="breakdown-card">
+      <div class="breakdown-header">
+        <span class="breakdown-title">Loan Summary</span>
+      </div>
+      <div class="loan-grid cols-1">
+        <div class="loan-stat">
+          <div class="loan-stat-lbl">Amount financed</div>
+          <div class="loan-stat-val" data-slot="0" id="loan-amount">—</div>
+        </div>
+        <div class="loan-stat">
+          <div class="loan-stat-lbl">Total interest paid</div>
+          <div class="loan-stat-val" data-slot="0" id="loan-interest">—</div>
+        </div>
+        <div class="loan-stat">
+          <div class="loan-stat-lbl">Total paid over loan</div>
+          <div class="loan-stat-val" data-slot="0" id="loan-total">—</div>
+        </div>
+        <div class="loan-stat">
+          <div class="loan-stat-lbl">Price after tax</div>
+          <div class="loan-stat-val" data-slot="0" id="loan-taxed">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cost breakdown -->
+    <div class="breakdown-card">
+      <div class="breakdown-header">
+        <span class="breakdown-title">Monthly Cost Breakdown</span>
+      </div>
+      <div class="breakdown-body">
+        <div class="brow-thead cols-1"><span>Item</span><span data-slot="0">Amount</span></div>
+        <div class="brow cols-1"><span class="brow-lbl">Car payment</span><span class="brow-val" data-slot="0" id="b-pmt">—</span></div>
+        <div class="brow cols-1"><span class="brow-lbl">Fuel</span><span class="brow-val" data-slot="0" id="b-fuel">—</span></div>
+        <div class="brow cols-1"><span class="brow-lbl">Insurance</span><span class="brow-val" data-slot="0" id="b-ins">—</span></div>
+        <div class="brow cols-1"><span class="brow-lbl">Maintenance (est.)</span><span class="brow-val" data-slot="0" id="b-maint">—</span></div>
+        <div class="brow cols-1"><span class="brow-lbl">Registration (÷12)</span><span class="brow-val" data-slot="0" id="b-reg">—</span></div>
+        <div class="brow cols-1 total"><span class="brow-lbl">Total / month</span><span class="brow-val" data-slot="0" id="b-total">—</span></div>
+      </div>
+      <div class="note">Maintenance and registration are typical monthly estimates for this vehicle class. Adjust your insurance figure on the left.</div>
+    </div>
+
+    <!-- Bar chart -->
+    <div class="chart-card">
+      <div class="chart-top">
+        <div class="chart-heading">Where your money goes</div>
+      </div>
+      <div class="bars-wrap" id="bars"></div>
+    </div>
+
+    <!-- 5-year forecast -->
+    <div class="breakdown-card">
+      <div class="breakdown-header">
+        <span class="breakdown-title">5-Year Cumulative Cost Forecast</span>
+        <span style="font-size:10px;color:var(--ink3);font-family:'DM Mono',monospace">3% annual gas inflation</span>
+      </div>
+      <table class="ftable">
+        <thead><tr><th>Period</th><th data-slot="0">Cumulative cost</th><th>Per month avg</th></tr></thead>
+        <tbody id="forecast-body"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+let currentVehicleId = VEHICLES[0].id;
+
+function renderVehicleSelect() {
+  const sel = document.getElementById('vehicle-select');
+  sel.innerHTML = buildVehicleSelect(currentVehicleId);
+  sel.addEventListener('change', e => {
+    currentVehicleId = e.target.value;
+    update();
+  });
+}
+
+function update() {
+  const v = VEHICLES.find(x => x.id === currentVehicleId);
+  const inp = getInputs();
+  const c = calcCar(v, inp);
+
+  document.getElementById('vehicle-detail').textContent = v.notes + ' · ' + v.mpg + ' MPG combined';
+  document.getElementById('vehicle-price').textContent = dollar(v.price);
+
+  document.getElementById('r-total').textContent = dollar(c.total) + '/mo';
+  document.getElementById('r-payment').textContent = dollar(c.payment);
+  document.getElementById('r-payment-sub').textContent = inp.term + '-mo. loan @ ' + inp.apr.toFixed(2) + '%';
+  document.getElementById('r-fuel').textContent = dollar(c.fuel);
+  document.getElementById('r-fuel-sub').textContent = inp.miles.toLocaleString() + ' mi @ $' + inp.gas.toFixed(2) + '/gal';
+
+  document.getElementById('loan-amount').textContent = dollar(c.loan);
+  document.getElementById('loan-interest').textContent = dollar(c.interest);
+  document.getElementById('loan-total').textContent = dollar(c.totalPaid);
+  document.getElementById('loan-taxed').textContent = dollar(c.taxedPrice);
+
+  document.getElementById('b-pmt').textContent = dollar(c.payment);
+  document.getElementById('b-fuel').textContent = dollar(c.fuel);
+  document.getElementById('b-ins').textContent = dollar(c.ins);
+  document.getElementById('b-maint').textContent = dollar(c.maint);
+  document.getElementById('b-reg').textContent = dollar(c.reg);
+  document.getElementById('b-total').textContent = dollar(c.total);
+
+  // Bar chart
+  const items = [
+    { label: 'Car payment', val: c.payment },
+    { label: 'Fuel',        val: c.fuel },
+    { label: 'Insurance',   val: c.ins },
+    { label: 'Maintenance', val: c.maint },
+    { label: 'Registration',val: c.reg },
+  ];
+  const maxVal = Math.max(...items.map(i => i.val));
+  document.getElementById('bars').innerHTML = items.map(item => {
+    const pct = maxVal > 0 ? (item.val / maxVal * 100).toFixed(1) : 0;
+    const sharePct = (item.val / c.total * 100).toFixed(0);
+    return `
+      <div class="bar-group">
+        <div class="bar-label-row"><span class="lbl">${item.label}</span><span>${sharePct}% of total</span></div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${pct}%;background:var(--c1)">
+            <span class="bar-fill-val">${dollar(item.val)}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Forecast
+  const fc = buildForecast(v, inp, c);
+  const tbody = document.getElementById('forecast-body');
+  tbody.innerHTML = fc.map(p => {
+    const avg = p.cum / p.months;
+    return `<tr>
+      <td>${p.label}</td>
+      <td data-slot="0">${dollar(p.cum)}</td>
+      <td>${dollar(avg)}/mo</td>
+    </tr>`;
+  }).join('');
+}
+
+buildSidebar(document.getElementById('sidebar'), update);
+renderVehicleSelect();
+refreshSidebarLabels();
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriveSmart — Compare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="logo">Drive<span>Smart</span></a>
+  <nav class="tabs">
+    <a href="index.html">Home</a>
+    <a href="single.html">Single Vehicle</a>
+    <a href="compare.html" class="active">Compare</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <h1>Compare up to <em>three vehicles</em></h1>
+  <p>Pick your contenders. See which one wins on monthly cost and 5-year ownership.</p>
+</div>
+
+<div class="main with-sidebar">
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="panel">
+
+    <!-- Picker -->
+    <div id="picker-area"></div>
+
+    <!-- Result containers (rendered dynamically) -->
+    <div id="results-area"></div>
+
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+const MAX_CARS = 3;
+
+// Default selection: first three vehicles
+let selectedIds = [
+  VEHICLES[0].id,
+  VEHICLES[3].id,
+  null,
+];
+
+function activeIds() {
+  return selectedIds.filter(id => id !== null);
+}
+
+function renderPicker() {
+  const area = document.getElementById('picker-area');
+  const ids = activeIds();
+  const slotCount = selectedIds.filter(id => id !== null).length;
+  const colsClass = `cols-${slotCount}`;
+
+  let html = `<div class="picker-grid ${colsClass}">`;
+  selectedIds.forEach((id, slot) => {
+    if (id === null) return;
+    const v = VEHICLES.find(x => x.id === id);
+    const others = activeIds().filter(o => o !== id);
+    html += `
+      <div class="picker-card" data-slot="${slot}">
+        <div class="picker-label">
+          <span>VEHICLE ${slot + 1}</span>
+          ${slotCount > 1 ? `<button class="remove-btn" onclick="removeSlot(${slot})" title="Remove">×</button>` : ''}
+        </div>
+        <select class="car-select" onchange="setVehicle(${slot}, this.value)">
+          ${buildVehicleSelect(id, others)}
+        </select>
+        <div class="picker-detail">
+          <span>${v.notes} · ${v.mpg} MPG</span>
+          <span class="price">${dollar(v.price)}</span>
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  // Add-car button
+  if (slotCount < MAX_CARS) {
+    html += `<button class="add-car-btn" onclick="addSlot()">+ Add another vehicle to compare</button>`;
+  }
+
+  area.innerHTML = html;
+}
+
+function setVehicle(slot, id) {
+  selectedIds[slot] = id;
+  renderPicker();
+  update();
+}
+
+function addSlot() {
+  const usedIds = activeIds();
+  // Find first unused vehicle to default to
+  const firstAvailable = VEHICLES.find(v => !usedIds.includes(v.id));
+  if (!firstAvailable) return;
+  for (let i = 0; i < selectedIds.length; i++) {
+    if (selectedIds[i] === null) {
+      selectedIds[i] = firstAvailable.id;
+      break;
+    }
+  }
+  renderPicker();
+  update();
+}
+
+function removeSlot(slot) {
+  selectedIds[slot] = null;
+  // Compact: shift nulls to end
+  const nonNull = selectedIds.filter(id => id !== null);
+  selectedIds = [...nonNull, ...new Array(MAX_CARS - nonNull.length).fill(null)];
+  renderPicker();
+  update();
+}
+
+function update() {
+  const area = document.getElementById('results-area');
+  const ids = activeIds();
+  if (ids.length === 0) {
+    area.innerHTML = `
+      <div class="empty-state">
+        <h3>No vehicles selected</h3>
+        <p>Add at least one vehicle above to see the comparison.</p>
+      </div>`;
+    return;
+  }
+
+  const inp = getInputs();
+  const cars = ids.map(id => VEHICLES.find(v => v.id === id));
+  const calcs = cars.map(v => calcCar(v, inp));
+  const colsClass = `cols-${cars.length}`;
+
+  // Find cheapest
+  const cheapestIdx = calcs.reduce((best, c, i) => c.total < calcs[best].total ? i : best, 0);
+  const mostExpensiveIdx = calcs.reduce((worst, c, i) => c.total > calcs[worst].total ? i : worst, 0);
+
+  let html = '';
+
+  // ── PAYMENT CARDS ───────────────────────────────────────────────
+  html += `<div class="result-row ${colsClass}">`;
+  cars.forEach((v, i) => {
+    html += `
+      <div class="result-card" data-slot="${i}">
+        <div class="result-label">${v.year} ${v.make} ${v.model}</div>
+        <div class="result-main">${dollar(calcs[i].total)}</div>
+        <div class="result-sub">total / mo · ${v.trim}</div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  // ── SAVINGS BANNER ──────────────────────────────────────────────
+  if (cars.length > 1) {
+    const cheapest = cars[cheapestIdx];
+    const expensive = cars[mostExpensiveIdx];
+    const monthlySavings = calcs[mostExpensiveIdx].total - calcs[cheapestIdx].total;
+    const fiveYearSavings = monthlySavings * 60;
+    html += `
+      <div class="savings-card">
+        <div>
+          <div class="savings-label">Cheapest pick: <strong>${cheapest.year} ${cheapest.make} ${cheapest.model}</strong></div>
+          <div class="savings-val">${dollar(monthlySavings)}/mo saved</div>
+        </div>
+        <div class="savings-note">
+          vs. ${expensive.make} ${expensive.model}<br>
+          ≈ ${dollar(fiveYearSavings)} over 5 years
+        </div>
+      </div>`;
+  }
+
+  // ── MONTHLY BREAKDOWN ───────────────────────────────────────────
+  html += `
+    <div class="breakdown-card">
+      <div class="breakdown-header">
+        <span class="breakdown-title">Monthly Cost Breakdown</span>
+      </div>
+      <div class="breakdown-body">
+        <div class="brow-thead ${colsClass}">
+          <span>Item</span>
+          ${cars.map((v, i) => `<span data-slot="${i}">${v.make} ${v.model.split(' ')[0]}</span>`).join('')}
+        </div>
+        ${[
+          ['Car payment', 'payment'],
+          ['Fuel', 'fuel'],
+          ['Insurance', 'ins'],
+          ['Maintenance', 'maint'],
+          ['Registration', 'reg'],
+        ].map(([lbl, key]) => `
+          <div class="brow ${colsClass}">
+            <span class="brow-lbl">${lbl}</span>
+            ${calcs.map((c, i) => `<span class="brow-val" data-slot="${i}">${dollar(c[key])}</span>`).join('')}
+          </div>`).join('')}
+        <div class="brow ${colsClass} total">
+          <span class="brow-lbl">Total / month</span>
+          ${calcs.map((c, i) => `<span class="brow-val" data-slot="${i}">${dollar(c.total)}</span>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  // ── LOAN SUMMARY ────────────────────────────────────────────────
+  html += `
+    <div class="breakdown-card">
+      <div class="breakdown-header">
+        <span class="breakdown-title">Loan Summary</span>
+      </div>
+      <div class="loan-grid ${colsClass}">
+        ${cars.map((v, i) => `
+          <div class="loan-stat">
+            <div class="loan-stat-lbl">${v.make} ${v.model.split(' ')[0]} financed</div>
+            <div class="loan-stat-val" data-slot="${i}">${dollar(calcs[i].loan)}</div>
+          </div>`).join('')}
+        ${cars.map((v, i) => `
+          <div class="loan-stat">
+            <div class="loan-stat-lbl">${v.make} ${v.model.split(' ')[0]} interest</div>
+            <div class="loan-stat-val" data-slot="${i}">${dollar(calcs[i].interest)}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  // ── BAR CHART ───────────────────────────────────────────────────
+  const items = [
+    { label: 'Car payment', key: 'payment' },
+    { label: 'Fuel',        key: 'fuel' },
+    { label: 'Insurance',   key: 'ins' },
+    { label: 'Maintenance', key: 'maint' },
+    { label: 'Registration',key: 'reg' },
+  ];
+  const allValues = calcs.flatMap(c => items.map(i => c[i.key]));
+  const maxVal = Math.max(...allValues);
+  const colorVars = ['var(--c1)', 'var(--c2)', 'var(--c3)'];
+
+  html += `
+    <div class="chart-card">
+      <div class="chart-top">
+        <div class="chart-heading">Side-by-side cost visual</div>
+        <div class="chart-legend">
+          ${cars.map((v, i) => `
+            <div class="legend-item">
+              <div class="legend-dot" style="background:${colorVars[i]}"></div>
+              ${v.make} ${v.model.split(' ')[0]}
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="bars-wrap">
+        ${items.map(item => `
+          <div class="bar-group">
+            <div class="bar-label-row"><span class="lbl">${item.label}</span><span></span></div>
+            ${calcs.map((c, i) => {
+              const pct = maxVal > 0 ? (c[item.key] / maxVal * 100).toFixed(1) : 0;
+              return `
+                <div class="bar-track">
+                  <div class="bar-fill" style="width:${pct}%;background:${colorVars[i]}">
+                    <span class="bar-fill-val">${dollar(c[item.key])}</span>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  // ── 5-YEAR FORECAST ─────────────────────────────────────────────
+  const forecasts = cars.map((v, i) => buildForecast(v, inp, calcs[i]));
+  html += `
+    <div class="breakdown-card">
+      <div class="breakdown-header">
+        <span class="breakdown-title">5-Year Cumulative Cost Forecast</span>
+        <span style="font-size:10px;color:var(--ink3);font-family:'DM Mono',monospace">3% annual gas inflation</span>
+      </div>
+      <table class="ftable">
+        <thead>
+          <tr>
+            <th>Period</th>
+            ${cars.map((v, i) => `<th data-slot="${i}">${v.make} ${v.model.split(' ')[0]}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${forecasts[0].map((_, periodIdx) => `
+            <tr>
+              <td>${forecasts[0][periodIdx].label}</td>
+              ${forecasts.map((f, i) => `<td data-slot="${i}">${dollar(f[periodIdx].cum)}</td>`).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="note">Cumulative totals include payment, fuel, insurance, maintenance, and registration. Based on your current slider settings.</div>
+    </div>`;
+
+  area.innerHTML = html;
+}
+
+buildSidebar(document.getElementById('sidebar'), update);
+refreshSidebarLabels();
+renderPicker();
+update();
+</script>
+</body>
+</html>

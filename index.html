@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriveSmart — Car Cost Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .home-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+  .home-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 2rem;
+    transition: all .2s;
+    cursor: pointer;
+    display: block;
+  }
+  .home-card:hover {
+    border-color: var(--ink);
+    transform: translateY(-2px);
+  }
+  .home-card-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--ink3);
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+  }
+  .home-card h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+  }
+  .home-card p {
+    font-size: 13px;
+    color: var(--ink3);
+    margin-bottom: 1.25rem;
+  }
+  .home-card-arrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  @media (max-width: 680px) {
+    .home-cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="logo">Drive<span>Smart</span></a>
+  <nav class="tabs">
+    <a href="index.html" class="active">Home</a>
+    <a href="single.html">Single Vehicle</a>
+    <a href="compare.html">Compare</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <h1>Find the car that<br>actually <em>fits your budget.</em></h1>
+  <p>Real numbers. Real monthly cost. Pick your tool below.</p>
+</div>
+
+<div class="main">
+  <div class="home-cards">
+    <a href="single.html" class="home-card">
+      <div class="home-card-num">01 / DEEP DIVE</div>
+      <h2>Single Vehicle Analysis</h2>
+      <p>Pick one car and get the full picture — monthly payment, fuel, insurance, 5-year forecast, and total interest paid.</p>
+      <div class="home-card-arrow">Open analysis →</div>
+    </a>
+    <a href="compare.html" class="home-card">
+      <div class="home-card-num">02 / SIDE BY SIDE</div>
+      <h2>Compare Up to 3 Cars</h2>
+      <p>Stack up to three vehicles head-to-head. See which one actually saves you money over five years of ownership.</p>
+      <div class="home-card-arrow">Open comparison →</div>
+    </a>
+  </div>
+</div>
+
+</body>
+</html>
